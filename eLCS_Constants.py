@@ -39,7 +39,7 @@ class Constants:
         else:
             self.testFile = "Existant"
 
-        if par['randomSeed'] == False:
+        if str(par['randomSeed']) == 'False':
             self.useSeed = False                                                #Saved as Boolean
         else:
             self.useSeed = True                                                 #Saved as Boolean
