@@ -34,7 +34,7 @@ class Offline_Environment:
         #Initialize global variables-------------------------------------------------
         self.dataRef = 0
         self.storeDataRef = 0
-        self.formatData = DataManagement(cons.trainFile, cons.testFile)
+        self.formatData = DataManagement(cons.train,cons.test)
         
         #Initialize the first dataset instance to be passed to eLCS
         self.currentTrainState = self.formatData.trainFormatted[self.dataRef][0]

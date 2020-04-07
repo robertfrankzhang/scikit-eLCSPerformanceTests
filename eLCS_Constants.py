@@ -22,30 +22,57 @@ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 ---------------------------------------------------------------------------------------------------------------------------------------------------------
 """
 import os
+import pandas as pd
+import numpy as np
+import random
+import copy
 
 class Constants:
     def setConstants(self,par):
         """ Takes the parameters parsed as a dictionary from eLCS_ConfigParser and saves them as global constants. """
         
         # Major Run Parameters -----------------------------------------------------------------------------------------
-        self.trainFile = os.path.join(par['datasetDirectory'], par['trainFile'])                    #Saved as text
-        if par['testFile'] == 'None':
-            self.testFile = 'None'                                                                  #Saved as text
+        self.cv = par['cv']                                                                         #If False, no cv, if int, do that many cvs
+        self.dataFile = par['dataFile']
+        if self.cv == False:
+            self.testFile = "None"
         else:
-            self.testFile = os.path.join(par['datasetDirectory'], par['testFile'])                  #Saved as text
-        self.originalOutFileName = os.path.join(par['outputDirectory'], str(par['outputFile']))     #Saved as text
-        self.outFileName = os.path.join(par['outputDirectory'], str(par['outputFile'])+'_eLCS')     #Saved as text
+            self.testFile = "Existant"
+
+        if par['randomSeed'] == False:
+            self.useSeed = False                                                #Saved as Boolean
+        else:
+            self.useSeed = True                                                 #Saved as Boolean
+            self.randomSeed = int(par['randomSeed'])                            #Saved as integer
+
+        # Set random seed if specified.-----------------------------------------------
+        if self.useSeed:
+            random.seed(self.randomSeed)
+        else:
+            random.seed(None)
+
+        d = pd.read_csv(self.dataFile)
+        data = d.values.tolist()
+        random.shuffle(data)
+        self.trainHeaderList1 = d.columns.values.tolist()
+        self.testHeaderList1 = d.columns.values.tolist()
+        self.trainHeaderList = copy.deepcopy(self.trainHeaderList1)
+        self.testHeaderList = copy.deepcopy(self.testHeaderList1)
+
+        if self.cv == False:
+            self.train = data
+            self.test = []
+        else:
+            self.cvCount = 0
+            self.split = np.array_split(data, self.cv)
+            for i in range(len(self.split)):
+                self.split[i] = self.split[i].tolist()
+
         self.learningIterations = par['learningIterations']                     #Saved as text
         self.N = int(par['N'])                                                  #Saved as integer
         self.p_spec = float(par['p_spec'])                                      #Saved as float
         
         # Logistical Run Parameters ------------------------------------------------------------------------------------
-        if par['randomSeed'] == 'False' or par['randomSeed'] == 'false':
-            self.useSeed = False                                                #Saved as Boolean
-        else:
-            self.useSeed = True                                                 #Saved as Boolean
-            self.randomSeed = int(par['randomSeed'])                            #Saved as integer
-            
         self.labelInstanceID = par['labelInstanceID']                           #Saved as text
         self.labelPhenotype = par['labelPhenotype']                             #Saved as text
         self.labelMissingData = par['labelMissingData']                         #Saved as text
@@ -66,14 +93,28 @@ class Constants:
         self.fitnessReduction = float(par['fitnessReduction'])                  #Saved as float
         
         # Algorithm Heuristic Options -------------------------------------------------------------------------------
-        self.doSubsumption = bool(int(par['doSubsumption']))                    #Saved as Boolean
+        self.doSubsumption = par['doSubsumption']                  #Saved as Boolean
         self.selectionMethod = par['selectionMethod']                           #Saved as text
         self.theta_sel = float(par['theta_sel'])                                #Saved as float
         
         # PopulationReboot -------------------------------------------------------------------------------
-        self.doPopulationReboot = bool(int(par['doPopulationReboot']))          #Saved as Boolean
+        self.doPopulationReboot = par['doPopulationReboot']          #Saved as Boolean
         self.popRebootPath = par['popRebootPath']                               #Saved as text
-        
+
+    def setCV(self):
+        if self.cv == False:
+            pass
+        else:
+            self.trainHeaderList = copy.deepcopy(self.trainHeaderList1)
+            self.testHeaderList = copy.deepcopy(self.testHeaderList1)
+            train = copy.deepcopy(self.split)
+            train.pop(self.cvCount)
+            t = []
+            for i in range(len(self.split) - 1):
+                t += train[i]
+            self.train = t
+            self.test = self.split[0]
+            self.cvCount+=1
         
     def referenceTimer(self, timer):
         """ Store reference to the timer object. """
@@ -83,8 +124,7 @@ class Constants:
     def referenceEnv(self, e):
         """ Store reference to environment object. """
         self.env = e
- 
-        
+
     def parseIterations(self):
         """ Parse the 'learningIterations' string to identify the maximum number of learning iterations as well as evaluation checkpoints. """
         checkpoints = self.learningIterations.split('.') 

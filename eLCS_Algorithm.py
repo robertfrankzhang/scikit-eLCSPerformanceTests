@@ -28,7 +28,6 @@ from eLCS_Constants import *
 from eLCS_ClassifierSet import ClassifierSet
 from eLCS_Prediction import *
 from eLCS_ClassAccuracy import ClassAccuracy
-from eLCS_OutputFileManager import OutputFileManager
 import copy
 import random
 import math
@@ -37,7 +36,6 @@ import math
 class eLCS:
     def __init__(self):
         """ Initializes the eLCS algorithm """
-        print("eLCS: Initializing Algorithm...")
         #Global Parameters-------------------------------------------------------------------------------------
         self.population = None          # The rule population (the 'solution/model' evolved by eLCS)
         self.learnTrackOut = None       # Output file that will store tracking information during learning
@@ -52,17 +50,6 @@ class eLCS:
         # NORMAL eLCS - Run eLCS from scratch on given data
         #-------------------------------------------------------
         else:
-            try:
-                self.learnTrackOut = open(cons.outFileName+'_LearnTrack.txt','w')   
-            except Exception as inst:
-                print(type(inst))
-                print(inst.args)
-                print(inst)
-                print('cannot open', cons.outFileName+'_LearnTrack.txt')
-                raise 
-            else:  
-                self.learnTrackOut.write("Explore_Iteration\tMacroPopSize\tMicroPopSize\tAccuracy_Estimate\tAveGenerality\tExpRules\tTime(min)\n")
-            
             # Instantiate Population---------
             self.population = ClassifierSet()
             self.exploreIter = 0
@@ -75,12 +62,6 @@ class eLCS:
     def run_eLCS(self):
         """ Runs the initialized eLCS algorithm. """
         #--------------------------------------------------------------
-        print("Learning Checkpoints: " +str(cons.learningCheckpoints))
-        print("Maximum Iterations: " +str(cons.maxLearningIterations))
-        print("Beginning eLCS learning iterations.")
-        print("------------------------------------------------------------------------------------------------------------------------------------------------------")
-
-        #-------------------------------------------------------
         # MAJOR LEARNING LOOP
         #-------------------------------------------------------
         while self.exploreIter < cons.maxLearningIterations: 
@@ -102,16 +83,16 @@ class eLCS:
             if (self.exploreIter%cons.trackingFrequency) == (cons.trackingFrequency - 1) and self.exploreIter > 0:
                 self.population.runPopAveEval(self.exploreIter) 
                 trackedAccuracy = sum(self.correct)/float(cons.trackingFrequency) #Accuracy over the last "trackingFrequency" number of iterations.
-                self.learnTrackOut.write(self.population.getPopTrack(trackedAccuracy, self.exploreIter+1,cons.trackingFrequency)) #Report learning progress to standard out and tracking file.
             cons.timer.stopTimeEvaluation()
             
             #-------------------------------------------------------
             # CHECKPOINT - COMPLETE EVALUTATION OF POPULATION - strategy different for discrete vs continuous phenotypes
             #-------------------------------------------------------
             if (self.exploreIter + 1) in cons.learningCheckpoints:
-                cons.timer.startTimeEvaluation()
-                print("------------------------------------------------------------------------------------------------------------------------------------------------------")
-                print("Running Population Evaluation after " + str(self.exploreIter + 1)+ " iterations.")
+                if self.exploreIter + 1 != cons.maxLearningIterations:
+                    cons.timer.startTimeEvaluation()
+                else:
+                    cons.timer.returnGlobalTimer()
                 
                 self.population.runPopAveEval(self.exploreIter)
                 self.population.runAttGeneralitySum(True)
@@ -131,42 +112,26 @@ class eLCS:
                         trainEval = self.doContPopEvaluation(True)
                         testEval = None
 
+                self.trainEval = trainEval
+                self.testEval = testEval
                 cons.env.stopEvaluationMode() #Returns to learning position in training data
-                cons.timer.stopTimeEvaluation()
-                cons.timer.returnGlobalTimer() 
-                    
-                #Write output files----------------------------------------------------------------------------------------------------------
-                OutputFileManager().writePopStats(cons.outFileName, trainEval, testEval, self.exploreIter + 1, self.population, self.correct)
-                OutputFileManager().writePop(cons.outFileName, self.exploreIter + 1, self.population)
+                if self.exploreIter + 1 != cons.maxLearningIterations:
+                    cons.timer.stopTimeEvaluation()
+                    cons.timer.returnGlobalTimer()
                 #----------------------------------------------------------------------------------------------------------------------------
 
-                print("Continue Learning...")
-                print("------------------------------------------------------------------------------------------------------------------------------------------------------")
-            
             #-------------------------------------------------------
             # ADJUST MAJOR VALUES FOR NEXT ITERATION
             #-------------------------------------------------------
             self.exploreIter += 1       # Increment current learning iteration
             cons.env.newInstance(True)  # Step to next instance in training set
-            
-        # Once eLCS has reached the last learning iteration, close the tracking file 
-        self.learnTrackOut.close()
-        print("eLCS Run Complete")
-        
-        
+
     def runIteration(self, state_phenotype, exploreIter):
         """ Run a single eLCS learning iteration. """
-        #print("ITERATION:"+str(self.exploreIter))
-        #print("Population Set Size: "+str(len(self.population.popSet)))
         #-----------------------------------------------------------------------------------------------------------------------------------------
         # FORM A MATCH SET - includes covering
         #-----------------------------------------------------------------------------------------------------------------------------------------
         self.population.makeMatchSet(state_phenotype, exploreIter)
-
-        #print("Match Set Size: "+str(len(self.population.matchSet)))
-        #for classifierRef in self.population.matchSet:
-        #    print(self.population.popSet[classifierRef].printClassifier())
-        #print()
         #-----------------------------------------------------------------------------------------------------------------------------------------
         # MAKE A PREDICTION - utilized here for tracking estimated learning progress.  Typically used in the explore phase of many LCS algorithms.
         #-----------------------------------------------------------------------------------------------------------------------------------------
@@ -203,10 +168,6 @@ class eLCS:
         # FORM A CORRECT SET
         #-----------------------------------------------------------------------------------------------------------------------------------------
         self.population.makeCorrectSet(state_phenotype[1])
-        #print("Correct Set Size: "+str(len(self.population.correctSet)))
-        #for classifierRef in self.population.correctSet:
-        #    print(self.population.popSet[classifierRef].printClassifier())
-        #print()
         #-----------------------------------------------------------------------------------------------------------------------------------------
         # UPDATE PARAMETERS
         #-----------------------------------------------------------------------------------------------------------------------------------------
@@ -303,17 +264,7 @@ class eLCS:
         
         adjustedStandardAccuracy = (standardAccuracy * predictionMade) + ((1.0 - predictionMade) * (1.0 / float(len(phenotypeList))))
         adjustedBalancedAccuracy = (balancedAccuracy * predictionMade) + ((1.0 - predictionMade) * (1.0 / float(len(phenotypeList))))
-        
-        #Adjusted Balanced Accuracy is calculated such that instances that did not match have a consistent probability of being correctly classified in the reported accuracy.
-        print("-----------------------------------------------")
-        print(str(myType)+" Accuracy Results:-------------")
-        print("Instance Coverage = "+ str(instanceCoverage*100.0)+ '%')
-        print("Prediction Ties = "+ str(predictionTies*100.0)+ '%')
-        print(str(instancesCorrectlyClassified) + ' out of ' + str(instances) + ' instances covered and correctly classified.')
-        print("Standard Accuracy (Adjusted) = " + str(adjustedStandardAccuracy))
-        print("Balanced Accuracy (Adjusted) = " + str(adjustedBalancedAccuracy))
-        #Balanced and Standard Accuracies will only be the same when there are equal instances representative of each phenotype AND there is 100% covering.
-        resultList = [adjustedBalancedAccuracy, instanceCoverage]  
+        resultList = [adjustedBalancedAccuracy, instanceCoverage]
         return resultList
         
     
@@ -363,13 +314,7 @@ class eLCS:
         instanceCoverage = 1.0 - (float(noMatch)/float(instances))
         adjustedAccuracyEstimate = accuracyEstimateSum / float(instances) #noMatchs are treated as incorrect predictions (can see no other fair way to do this)
 
-        print("-----------------------------------------------")
-        print(str(myType)+" Accuracy Results:-------------")
-        print("Instance Coverage = "+ str(instanceCoverage*100.0)+ '%')
-        print("Estimated Prediction Accuracy (Ignore uncovered) = " + str(accuracyEstimate))
-        print("Estimated Prediction Accuracy (Penalty uncovered) = " + str(adjustedAccuracyEstimate))
-        #Balanced and Standard Accuracies will only be the same when there are equal instances representative of each phenotype AND there is 100% covering.
-        resultList = [adjustedAccuracyEstimate, instanceCoverage]  
+        resultList = [adjustedAccuracyEstimate, instanceCoverage]
         return resultList
     
     

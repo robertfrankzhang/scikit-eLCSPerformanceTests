@@ -26,17 +26,10 @@ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 #Import Required Modules---------------
 from eLCS_Constants import * 
 import random
-import sys
 #--------------------------------------
 
 class DataManagement:
-    def __init__(self, trainFile, testFile, infoList = None):
-        #Set random seed if specified.-----------------------------------------------
-        if cons.useSeed:
-            random.seed(cons.randomSeed)
-        else:
-            random.seed(None)
-
+    def __init__(self, rawTrainData, rawTestData, infoList = None):
         #Initialize global variables-------------------------------------------------
         self.numAttributes = None       # The number of attributes in the input file. 
         self.areInstanceIDs = False     # Does the dataset contain a column of Instance IDs? (If so, it will not be included as an attribute)
@@ -48,26 +41,17 @@ class DataManagement:
         self.phenotypeRange = None      # Stores the difference between the maximum and minimum values for a continuous phenotype
         
         #Train/Test Specific-----------------------------------------------------------------------------
-        self.trainHeaderList = []       # The dataset column headers for the training data
-        self.testHeaderList = []        # The dataset column headers for the testing data
+        self.trainHeaderList = cons.trainHeaderList       # The dataset column headers for the training data
+        self.testHeaderList = cons.testHeaderList        # The dataset column headers for the testing data
         self.numTrainInstances = None   # The number of instances in the training data
         self.numTestInstances = None    # The number of instances in the testing data
         
-        print("----------------------------------------------------------------------------")
-        print("eLCS Code Demo 5: The Complete eLCS Algorithm - Niche GA + Subsumption")
-        print("----------------------------------------------------------------------------")
-        print("Environment: Formatting Data... ")
-        
         #Detect Features of training data--------------------------------------------------------------------------
-        rawTrainData = self.loadData(trainFile, True) #Load the raw data.
-
-        self.characterizeDataset(rawTrainData)  #Detect number of attributes, instances, and reference locations.
+        self.characterizeDataset(rawTrainData,rawTestData)  #Detect number of attributes, instances, and reference locations.
         
         if cons.testFile == 'None': #If no testing data is available, formatting relies solely on training data.
             data4Formating = rawTrainData
         else:
-            rawTestData = self.loadData(testFile, False) #Load the raw data.
-            self.compareDataset(rawTestData) #Ensure that key features are the same between training and testing datasets.
             data4Formating = rawTrainData + rawTestData #Merge Training and Testing datasets
 
         self.discriminatePhenotype(data4Formating) #Determine if endpoint/phenotype is discrete or continuous.
@@ -83,36 +67,9 @@ class DataManagement:
         if cons.testFile != 'None':
             self.testFormatted = self.formatData(rawTestData) #Stores the formatted testing data set used throughout the algorithm.
 
-        self.trainFormatted = self.formatData(rawTrainData) #Stores the formatted training data set used throughout the algorithm.       
-        print("----------------------------------------------------------------------------")
+        self.trainFormatted = self.formatData(rawTrainData) #Stores the formatted training data set used throughout the algorithm.
 
-        
-    def loadData(self, dataFile, doTrain):
-        """ Load the data file. """     
-        print("DataManagement: Loading Data... " + str(dataFile))
-        datasetList = []
-        try:       
-            f = open(dataFile,'r')
-        except Exception as inst:
-            print(type(inst))
-            print(inst.args)
-            print(inst)
-            print('cannot open', dataFile)
-            raise 
-        else:
-            if doTrain:
-                self.trainHeaderList = f.readline().rstrip('\n').split('\t')   #strip off first row
-            else:
-                self.testHeaderList = f.readline().rstrip('\n').split('\t')   #strip off first row
-            for line in f:
-                lineList = line.strip('\n').split('\t')
-                datasetList.append(lineList)
-            f.close()
-
-        return datasetList
-    
-    
-    def characterizeDataset(self, rawTrainData):
+    def characterizeDataset(self, rawTrainData,rawTestData):
         " Detect basic dataset parameters " 
         #Detect Instance ID's and save location if they occur.  Then save number of attributes in data.
         if cons.labelInstanceID in self.trainHeaderList:
@@ -126,7 +83,6 @@ class DataManagement:
         #Identify location of phenotype column
         if cons.labelPhenotype in self.trainHeaderList:
             self.phenotypeRef = self.trainHeaderList.index(cons.labelPhenotype)
-            print("DataManagement: Phenotype Column Location = "+str(self.phenotypeRef))
         else:
             print("DataManagement: Error - Phenotype column not found!  Check data set to ensure correct phenotype column label, or inclusion in the data.")
 
@@ -135,21 +91,25 @@ class DataManagement:
             if self.phenotypeRef > self.instanceIDRef:
                 self.trainHeaderList.pop(self.phenotypeRef)
                 self.trainHeaderList.pop(self.instanceIDRef)
+                self.testHeaderList.pop(self.phenotypeRef)
+                self.testHeaderList.pop(self.instanceIDRef)
             else:
                 self.trainHeaderList.pop(self.instanceIDRef)
                 self.trainHeaderList.pop(self.phenotypeRef)
+                self.testHeaderList.pop(self.instanceIDRef)
+                self.testHeaderList.pop(self.phenotypeRef)
         else:
             self.trainHeaderList.pop(self.phenotypeRef)
+            self.testHeaderList.pop(self.phenotypeRef)
+
+
         
         #Store number of instances in training data
         self.numTrainInstances = len(rawTrainData)
-        print("DataManagement: Number of Attributes = " + str(self.numAttributes)) 
-        print("DataManagement: Number of Instances = " + str(self.numTrainInstances)) 
-
+        self.numTestInstances = len(rawTestData)
 
     def discriminatePhenotype(self, rawData):
         """ Determine whether the phenotype is Discrete(class-based) or Continuous """
-        print("DataManagement: Analyzing Phenotype...")
         inst = 0
         classDict = {}
         while self.discretePhenotype and len(list(classDict.keys())) <= cons.discreteAttributeLimit and inst < self.numTrainInstances:  #Checks which discriminate between discrete and continuous attribute
@@ -157,7 +117,6 @@ class DataManagement:
             if target in list(classDict.keys()):  #Check if we've seen this attribute state yet.
                 classDict[target] += 1
             elif target == cons.labelMissingData: #Ignore missing data
-                print("DataManagement: Warning - Individual detected with missing phenotype information!")
                 pass
             else: #New state observed
                 classDict[target] = 1
@@ -166,14 +125,9 @@ class DataManagement:
         if len(list(classDict.keys())) > cons.discreteAttributeLimit:
             self.discretePhenotype = False
             self.phenotypeList = [float(target),float(target)]
-            print("DataManagement: Phenotype Detected as Continuous.")
-        else:
-            print("DataManagement: Phenotype Detected as Discrete.")
-            
-    
+
     def discriminateClasses(self, rawData):
         """ Determines number of classes and their identifiers. Only used if phenotype is discrete. """
-        print("DataManagement: Detecting Classes...")
         inst = 0
         classCount = {}
         while inst < self.numTrainInstances:
@@ -184,35 +138,9 @@ class DataManagement:
                 self.phenotypeList.append(target)
                 classCount[target] = 1
             inst += 1
-        print("DataManagement: Following Classes Detected:" + str(self.phenotypeList))
-        for each in list(classCount.keys()):
-            print("Class: "+str(each)+ " count = "+ str(classCount[each]))
-            
-                     
-    def compareDataset(self, rawTestData):
-        " Ensures that the attributes in the testing data match those in the training data.  Also stores some information about the testing data. "
-        if self.areInstanceIDs:
-            if self.phenotypeRef > self.instanceIDRef:
-                self.testHeaderList.pop(self.phenotypeRef)
-                self.testHeaderList.pop(self.instanceIDRef)
-            else:
-                self.testHeaderList.pop(self.instanceIDRef)
-                self.testHeaderList.pop(self.phenotypeRef)
-        else:
-            self.testHeaderList.pop(self.phenotypeRef)
-            
-        if self.trainHeaderList != self.testHeaderList:
-            print("DataManagement: Error - Training and Testing Dataset Headers are not equivalent")
-
-        # Stores the number of instances in the testing data.
-        self.numTestInstances = len(rawTestData)
-        print("DataManagement: Number of Attributes = " + str(self.numAttributes)) 
-        print("DataManagement: Number of Instances = " + str(self.numTestInstances)) 
-
 
     def discriminateAttributes(self, rawData):
         """ Determine whether attributes in dataset are discrete or continuous and saves this information. """
-        print("DataManagement: Detecting Attributes...")
         self.discreteCount = 0
         self.continuousCount = 0
         for att in range(len(rawData[0])):
@@ -238,12 +166,9 @@ class DataManagement:
                 else:
                     self.attributeInfo.append([1,[float(target),float(target)]])   #[min,max]
                     self.continuousCount += 1
-        print("DataManagement: Identified "+str(self.discreteCount)+" discrete and "+str(self.continuousCount)+" continuous attributes.") #Debug
-
             
     def characterizeAttributes(self, rawData):
         """ Determine range (if continuous) or states (if discrete) for each attribute and saves this information"""
-        print("DataManagement: Characterizing Attributes...")
         attributeID = 0
         for att in range(len(rawData[0])):
             if att != self.instanceIDRef and att != self.phenotypeRef:  #Get just the attribute columns (ignores phenotype and instanceID columns)
@@ -270,7 +195,6 @@ class DataManagement:
 
     def characterizePhenotype(self, rawData):
         """ Determine range of phenotype values. """
-        print("DataManagement: Characterizing Phenotype...")
         for inst in range(len(rawData)):
             target = rawData[inst][self.phenotypeRef]
             
@@ -320,6 +244,6 @@ class DataManagement:
             else:
                 pass    #instance ID neither given nor required.
             #-----------------------------------------------------------
-        random.shuffle(formatted) #One time randomization of the order the of the instances in the data, so that if the data was ordered by phenotype, this potential learning bias (based on instance ordering) is eliminated.  
+        #random.shuffle(formatted) #One time randomization of the order the of the instances in the data, so that if the data was ordered by phenotype, this potential learning bias (based on instance ordering) is eliminated.
         return formatted
     

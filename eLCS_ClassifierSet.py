@@ -259,11 +259,6 @@ class ClassifierSet:
             print("ClassifierSet: Error - requested GA selection method not available.")
         cons.timer.stopTimeSelection()
 
-        #print("First Chosen Parent:")
-        #print(clP1.printClassifier())
-        #print("Second Chosen Parent")
-        #print(clP2.printClassifier())
-
         #-------------------------------------------------------
         # INITIALIZE OFFSPRING 
         #-------------------------------------------------------
@@ -393,8 +388,6 @@ class ClassifierSet:
             return
         
         self.addClassifierToPopulation(cl,False) #If no subsumer was found, check for identical classifier, if not then add the classifier to the population
-        #print("Offspring Classifier subsume2")
-        #print(cl.printClassifier())
 
     def doCorrectSetSubsumption(self):
         """ Executes correct set subsumption.  The correct set subsumption looks for the most general subsumer classifier in the correct set
@@ -458,10 +451,6 @@ class ClassifierSet:
                 self.addClassifierToPopulation(cl1, False) #False passed because this is not called for a covered rule.
             if len(cl2.specifiedAttList) > 0:
                 self.addClassifierToPopulation(cl2, False) #False passed because this is not called for a covered rule.
-            #print("Offspring Classifier:")
-            #print(cl1.printClassifier())
-            #print("Offspring Classifier:")
-            #print(cl2.printClassifier())
                 
     def updateSets(self, exploreIter):
         """ Updates all relevant parameters in the current match and correct sets. """
@@ -574,10 +563,5 @@ class ClassifierSet:
     def getPopTrack(self, accuracy, exploreIter, trackingFrequency):
         """ Returns a formated output string to be printed to the Learn Track output file. """
         trackString = str(exploreIter)+ "\t" + str(len(self.popSet)) + "\t" + str(self.microPopSize) + "\t" + str(accuracy) + "\t" + str(self.aveGenerality)  + "\t" + str(cons.timer.returnGlobalTimer())+ "\n"
-        if cons.env.formatData.discretePhenotype: #discrete phenotype
-            print(("Epoch: "+str(int(exploreIter/trackingFrequency))+"\t Iteration: " + str(exploreIter) + "\t MacroPop: " + str(len(self.popSet))+ "\t MicroPop: " + str(self.microPopSize) + "\t AccEstimate: " + str(accuracy) + "\t AveGen: " + str(self.aveGenerality)  + "\t Time: " + str(cons.timer.returnGlobalTimer())))
-        else: # continuous phenotype
-            print(("Epoch: "+str(int(exploreIter/trackingFrequency))+"\t Iteration: " + str(exploreIter) + "\t MacroPop: " + str(len(self.popSet))+ "\t MicroPop: " + str(self.microPopSize) + "\t AccEstimate: " + str(accuracy) + "\t AveGen: " + str(self.aveGenerality) + "\t PhenRange: " +str(self.avePhenotypeRange) + "\t Time: " + str(cons.timer.returnGlobalTimer())))
-
         return trackString
          

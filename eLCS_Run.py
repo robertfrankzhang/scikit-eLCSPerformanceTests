@@ -25,34 +25,24 @@ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 #Import Required Modules------------------------------------
 from eLCS_Timer import Timer
-from eLCS_ConfigParser import ConfigParser
+from eLCS_ParamParser import ParamParser
 from eLCS_Offline_Environment import Offline_Environment
 from eLCS_Algorithm import eLCS
 from eLCS_Constants import *
 #-----------------------------------------------------------
 
-helpstr = """Failed attempt to run e-LCS.  Please ensure that a configuration file giving all run parameters has been specified."""
-
-#Specify the name and file path for the configuration file. 
-configurationFile = "eLCS_Configuration_File.txt"
-
 #Obtain all run parameters from the configuration file and store them in the 'Constants' module.
-ConfigParser(configurationFile)
+l = []
+ParamParser("Datasets/Multiplexer6.csv", cv=3, labelPhenotype="class", learningIterations="10000", randomSeed=0)
 
-#Initialize the 'Timer' module which tracks the run time of algorithm and it's different components.
-timer = Timer() 
-cons.referenceTimer(timer)
-
-#Initialize the 'Environment' module which manages the data presented to the algorithm.  While e-LCS learns iteratively (one inistance at a time
-env = Offline_Environment()
-cons.referenceEnv(env) #Passes the environment to 'Constants' (cons) so that it can be easily accessed from anywhere within the code.
-cons.parseIterations() #Identify the maximum number of learning iterations as well as evaluation checkpoints.
-
-#Run the e-LCS algorithm.
-eLCS()
-print(cons.timer.globalDeletion)
-print(cons.timer.globalEvaluation)
-print(cons.timer.globalMatching)
-print(cons.timer.globalSelection)
-print(cons.timer.globalSubsumption)
-print(cons.timer.globalTime)
+for i in range(3):
+    cons.setCV()
+    timer = Timer()
+    cons.referenceTimer(timer)
+    env = Offline_Environment()
+    cons.referenceEnv(env)
+    cons.parseIterations()
+    e = eLCS()
+    print(e.testEval[0])
+    l.append(e.testEval[0])
+print(np.mean(np.array(l)))
