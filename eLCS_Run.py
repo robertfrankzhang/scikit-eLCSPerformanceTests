@@ -73,20 +73,46 @@ def runScikiteLCS(dataFile,classLabel,learningIterations,randomSeed,cv=False):
         dataPhenotypes = formatted[:,-1]
         return np.mean(cross_val_score(model,dataFeatures,dataPhenotypes,cv=cv))
 
-randomSeeds = [100,0,15,278,43]
+randomSeeds = [0]
 
-avgOriginal = 0
-for seed in randomSeeds:
-    o = runOriginaleLCS('Datasets/Multiplexer20.csv','class','3000',seed,cv=3)
-    print(o)
-    avgOriginal += o
-avgOriginal /= 5
-print("Average Testing Accuracy: "+str(avgOriginal))
+# avgOriginal = 0
+# for seed in randomSeeds:
+#     o = runOriginaleLCS('Datasets/Multiplexer11.csv','Class','1000',seed,cv=3)
+#     print(o)
+#     avgOriginal += o
+# avgOriginal /= len(randomSeeds)
+# print("Average Testing Accuracy: "+str(avgOriginal))
+#
+# avgScikit = 0
+# for seed in randomSeeds:
+#     s = runScikiteLCS('Datasets/Multiplexer11.csv','Class',1000,seed,cv=3)
+#     print(s)
+#     avgScikit += s
+# avgScikit /= len(randomSeeds)
+# print("Average Testing Accuracy: "+str(avgScikit))
+#
+# o = runOriginaleLCS('Datasets/Multiplexer11.csv','Class','1000',seed)[0]
+# s = runScikiteLCS('Datasets/Multiplexer11.csv','Class',1000,seed)[0]
+# print(o)
+# print(s)
 
-avgScikit = 0
-for seed in randomSeeds:
-    s = runScikiteLCS('Datasets/Multiplexer20.csv','class',3000,seed,cv=3)
-    print(s)
-    avgScikit += s
-avgScikit /= 5
-print("Average Testing Accuracy: "+str(avgScikit))
+import matplotlib.pyplot as plt
+
+fig,axes = plt.subplots(ncols=3,sharey=True)
+fig.subplots_adjust(wspace=0)
+
+A = [[0,1,2],[3,4,5]]
+B = [[1,0,1],[8,9,10]]
+C = [[2,10,12],[5,0,5]]
+data = {}
+data['6-bit'] = A
+data['11-bit'] = B
+data['20-bit'] = C
+
+for ax,name in zip(axes,['6-bit','11-bit','20-bit']):
+    ax.boxplot([data[name][item] for item in [0, 1]])
+    ax.set(xticklabels=['Original', 'scikit'], xlabel=name)
+    ax.margins(0.05) # Optional
+    if name == '6-bit':
+        ax.set_ylabel('y axis label')
+plt.show()
